@@ -7,16 +7,16 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 from Bio.PDB import PDBParser, PDBIO, Superimposer
-from number import write_renumbered_fv, get_renumbered_fv_from_saved
-from new_calc import get_coreset_atoms, centroid_and_vectors, as_unit, angle, apply_transform
+from .number import write_renumbered_fv, get_renumbered_fv_from_saved
+from .new_calc import get_coreset_atoms, centroid_and_vectors, as_unit, angle, apply_transform
 
-def values_single_MD(pdb_file, md_file, fv_out, data_path, pcsA, pcsB, coresets, out_dir):
+def values_single_MD(pdb_file, md_file, out_dir, data_path, pcsA, pcsB, coresets):
     """
     Loop through all frames of an MD trajectory and calculate BA, BC1, AC1, BC2, AC2, dc per frame.
     Returns a pandas DataFrame with columns: frame, BA, BC1, AC1, BC2, AC2, dc
     """
     pdb_name = Path(pdb_file).stem
-    fv_path = fv_out / f"{pdb_name}_fv.pdb"
+    fv_path = out_dir / f"{pdb_name}_fv.pdb"
     valid_pair, full_numbering=write_renumbered_fv(str(fv_path), str(pdb_file), fv_only=False)
     if not fv_path.exists():
         print(f"Skipping {pdb_name} as Fv file does not exist.")
@@ -55,6 +55,7 @@ def values_single_MD(pdb_file, md_file, fv_out, data_path, pcsA, pcsB, coresets,
     df = pd.DataFrame(results)
     df["frame"] = df.index  # add frame number
     df.to_csv(fv_out / f"{pdb_name}_angles.csv", index=False)
+    return df
 
 
 
@@ -115,15 +116,35 @@ def process_inmem(input_struct, consA, consB, pcsA, pcsB, coresets):
 
     return {"BA": BA, "BC1": BC1, "AC1": AC1, "BC2": BC2, "AC2": AC2, "dc": dc}
 
+# Paths and data loading
+data_path = Path("/workspaces/Graphormer/TRangle/data")
+out_dir = Path("outputs"); out_dir.mkdir(exist_ok=True)
+fv_out = out_dir/"fv"; fv_out.mkdir(exist_ok=True)
+
+coresets = json.load(open(data_path/"coresets.json"))
+pcsA = np.loadtxt(data_path/"principal_components_alpha.csv")
+pcsB = np.loadtxt(data_path/"principal_components_beta.csv")
+
+def run(pdb_file, md_file, out_dir):
+    #make sure out_dir exists
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results=values_single_MD(
+        pdb_file=pdb_file,
+        md_file=md_file,
+        out_dir=out_dir,
+        data_path=data_path,
+        pcsA=pcsA,
+        pcsB=pcsB,
+        coresets=coresets
+    )
+    return results
 
 if __name__ == "__main__":
-    data_path = Path("/workspaces/Graphormer/TRangle/data")
-    out_dir = Path("outputs"); out_dir.mkdir(exist_ok=True)
-    fv_out = out_dir/"fv"; fv_out.mkdir(exist_ok=True)
-
-    coresets = json.load(open(data_path/"coresets.json"))
-    pcsA = np.loadtxt(data_path/"principal_components_alpha.csv")
-    pcsB = np.loadtxt(data_path/"principal_components_beta.csv")
-
-    results = []
-    values_single_MD("/mnt/larry/lilian/DATA/Cory_data/A6/A6prmtop_first_frame.pdb", "/mnt/larry/lilian/DATA/Cory_data/A6/Prod_Concat_A6_CMD.xtc", fv_out, data_path, pcsA, pcsB, coresets, out_dir)
+    import argparse
+    parser = argparse.ArgumentParser(description="Calculate angles from MD trajectory")
+    parser.add_argument("--pdb_file", type=str, required=True, help="Path to the PDB file")
+    parser.add_argument("--md_file", type=str, required=True, help="Path to the MD trajectory file")
+    parser.add_argument("--out", type=str, default=str(fv_out), help="Output directory")
+    args = parser.parse_args()
+    run(pdb_file=args.pdb_file, md_file=args.md_file, out_dir=args.out)

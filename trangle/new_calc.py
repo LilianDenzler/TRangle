@@ -16,7 +16,8 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 from Bio.PDB import PDBParser, PDBIO, Superimposer
-from number import write_renumbered_fv
+from .number import write_renumbered_fv
+
 
 # -------------------------------------------------------
 # Data structures
@@ -70,7 +71,7 @@ def add_cgo_arrow(start,end,color,radius=0.3):
 # -------------------------------------------------------
 # Core alignment & angle calculation
 # -------------------------------------------------------
-def process(input_pdb, consA_pdb, consB_pdb, pcsA, pcsB, coresets, out_dir):
+def process(input_pdb, consA_pdb, consB_pdb, pcsA, pcsB, coresets, out_dir, vis_folder=None):
     parser = PDBParser(QUIET=True)
     input_struct = parser.get_structure("input", input_pdb)
     consA = parser.get_structure("consA", consA_pdb)
@@ -116,12 +117,15 @@ def process(input_pdb, consA_pdb, consB_pdb, pcsA, pcsB, coresets, out_dir):
 
     out_prefix = Path(out_dir)/Path(input_pdb).stem
     io = PDBIO()
-    io.set_structure(input_struct); input_aligned = f"{out_prefix}_aligned_input.pdb"; io.save(input_aligned)
-    io.set_structure(consA); consA_out = f"{out_prefix}_consA.pdb"; io.save(consA_out)
-    io.set_structure(consB); consB_out = f"{out_prefix}_consB.pdb"; io.save(consB_out)
-
-    generate_pymol_script(input_aligned, consA_out, consB_out, Apts, Bpts, out_prefix)
-
+    io.set_structure(input_struct); input_aligned = os.path.join(vis_folder,'aligned_input.pdb'); io.save(input_aligned)
+    io.set_structure(consA); consA_out = os.path.join(vis_folder,'consA.pdb'); io.save(consA_out)
+    io.set_structure(consB); consB_out = os.path.join(vis_folder,'consB.pdb'); io.save(consB_out)
+    #absolute path of the aligned input and consensus structures
+    input_aligned = os.path.abspath(input_aligned)
+    consA_out = os.path.abspath(consA_out)
+    consB_out = os.path.abspath(consB_out)
+    if vis_folder:
+        generate_pymol_script(input_aligned, consA_out, consB_out, Apts, Bpts, vis_folder)
     return {
         "pdb_name": Path(input_pdb).stem,
         "BA": BA, "BC1": BC1, "AC1": AC1, "BC2": BC2, "AC2": AC2, "dc": dc,
@@ -131,7 +135,7 @@ def process(input_pdb, consA_pdb, consB_pdb, pcsA, pcsB, coresets, out_dir):
 # -------------------------------------------------------
 # PyMOL visualisation
 # -------------------------------------------------------
-def generate_pymol_script(input_pdb, consA_pdb, consB_pdb, Apts, Bpts, out_prefix):
+def generate_pymol_script(input_pdb, consA_pdb, consB_pdb, Apts, Bpts, vis_folder):
     pdb_name = Path(input_pdb).stem
     scale = 15.0
     a1 = Apts.C + scale * (Apts.V1 - Apts.C)
@@ -177,83 +181,55 @@ cmd.angle("BC2_{pdb_name}","B2end_{pdb_name}","CBcent_{pdb_name}","CAcent_{pdb_n
 cmd.distance("dc_{pdb_name}","CAcent_{pdb_name}","CBcent_{pdb_name}")
 
 cmd.zoom("all")
-cmd.png("{out_prefix}_vis.png", dpi=300)
-cmd.save("{out_prefix}.pse")
+cmd.png("{os.path.join(vis_folder,'vis.png')}", dpi=300)
+cmd.save("{os.path.join(vis_folder,'vis.pse')}")
 cmd.quit()
 """
-    vis_script = f"{out_prefix}_vis.py"
+    vis_script = os.path.join(vis_folder,"vis.py")
     with open(vis_script, "w") as f:
         f.write(script)
     print(f"✅ PyMOL script written: {vis_script}")
 
-# -------------------------------------------------------
+
+# ========================
 # Main
-# -------------------------------------------------------
+# ========================
+# --- paths ---
+data_path = Path("/workspaces/Graphormer/TRangle/data")
+consA_path = Path(f"{data_path}/consensus_A.pdb")
+consB_path = Path(f"{data_path}/consensus_B.pdb")
+coresets = json.load(open(f"{data_path}/coresets.json"))
+pcsA = np.loadtxt(f"{data_path}/principal_components_alpha.csv")
+pcsB = np.loadtxt(f"{data_path}/principal_components_beta.csv")
 
-
-def values_single_pdb(pdb_file, fv_out, data_path, pcsA, pcsB, coresets, out_dir):
-    pdb_name = Path(pdb_file).stem
-    fv_path = fv_out/f"{pdb_name}_fv.pdb"
-    write_renumbered_fv(str(fv_path), str(pdb_file))
-    if not fv_path.exists():
-        print(f"Skipping {pdb_name} as Fv file does not exist.")
-
-    result = process(str(fv_path),
+def run(input_pdb, out_dir, vis=True):
+    pdb_name = Path(input_pdb).stem
+    out_dir.mkdir(exist_ok=True)
+    if vis:
+        vis_folder = out_dir / "vis"
+        vis_folder.mkdir(exist_ok=True)
+    write_renumbered_fv(os.path.join(out_dir, f"{pdb_name}fv.pdb"), str(input_pdb))
+    input_pdb=os.path.join(out_dir, f"{pdb_name}fv.pdb")
+    result = process(str(input_pdb),
                         str(data_path/"consensus_A.pdb"),
                         str(data_path/"consensus_B.pdb"),
-                        pcsA, pcsB, coresets, out_dir)
-    return result
-
+                        pcsA, pcsB, coresets, out_dir, vis_folder)
+    if vis_folder:
+        os.system(f"pymol -cq {os.path.join(vis_folder,'vis.py')}")
+        os.remove(os.path.join(vis_folder,'aligned_input.pdb'))
+        os.remove( os.path.join(vis_folder,'consA.pdb'))
+        os.remove( os.path.join(vis_folder,'consB.pdb'))
+    results_df = pd.DataFrame([result])[["pdb_name","BA","BC1","AC1","BC2","AC2","dc"]]
+    results_df.to_csv(out_dir/"angles_results.csv", index=False)
+    return results_df
 
 if __name__ == "__main__":
-    data_path = Path("/workspaces/Graphormer/TRangle/data")
-    input_folder = Path("/workspaces/Graphormer/TRangle/imgt")
-    out_dir = Path("outputs"); out_dir.mkdir(exist_ok=True)
-    fv_out = out_dir/"fv"; fv_out.mkdir(exist_ok=True)
+    import argparse
+    parser = argparse.ArgumentParser(description="Calculate TCR angles and generate visualizations.")
+    parser.add_argument("--input_pdb", type=str, required=True, help="Path to the input PDB file.")
+    parser.add_argument("--out_dir", type=Path, default=Path("output"), help="Directory to save output files.")
+    parser.add_argument("--vis", action="store_true", help="Generate PyMOL visualizations.")
+    args = parser.parse_args()
+    run(args.input_pdb, args.out_dir, args.vis)
 
-    coresets = json.load(open(data_path/"coresets.json"))
-    pcsA = np.loadtxt(data_path/"principal_components_alpha.csv")
-    pcsB = np.loadtxt(data_path/"principal_components_beta.csv")
 
-    results = []
-    result_single=values_single_pdb("/mnt/larry/lilian/DATA/Cory_data/A6/A6prmtop_first_frame.pdb",fv_out, data_path, pcsA, pcsB, coresets, out_dir)
-    pdb_name = Path("/workspaces/Graphormer/TRangle/imgt/3vwk.pdb").stem
-    print(f"Single PDB result: {result_single}")
-    # run PyMOL
-    vis_script = Path(out_dir)/f"{pdb_name}_fv_vis.py"
-    os.system(f"pymol -cq {vis_script}")
-
-    # clean up temporary pdbs and script
-    for suffix in ["_aligned_input.pdb","_consA.pdb","_consB.pdb","_vis.py"]:
-        try: os.remove(Path(out_dir)/f"{pdb_name}_fv{suffix}")
-        except FileNotFoundError: pass
-    quit()
-
-    for pdb_file in input_folder.glob("*.pdb"):
-        print(f"Processing {pdb_file.name}...")
-        pdb_name = pdb_file.stem
-        fv_path = fv_out/f"{pdb_name}_fv.pdb"
-        write_renumbered_fv(str(fv_path), str(pdb_file))
-        if not fv_path.exists():
-            print(f"Skipping {pdb_name} as Fv file does not exist.")
-            continue
-
-        result = process(str(fv_path),
-                         str(data_path/"consensus_A.pdb"),
-                         str(data_path/"consensus_B.pdb"),
-                         pcsA, pcsB, coresets, out_dir)
-        results.append(result)
-
-        # run PyMOL
-        vis_script = Path(out_dir)/f"{pdb_name}_fv_vis.py"
-        os.system(f"pymol -cq {vis_script}")
-
-        # clean up temporary pdbs and script
-        for suffix in ["_aligned_input.pdb","_consA.pdb","_consB.pdb","_vis.py"]:
-            try: os.remove(Path(out_dir)/f"{pdb_name}_fv{suffix}")
-            except FileNotFoundError: pass
-
-    # Save CSV
-    results_df = pd.DataFrame(results)[["pdb_name","BA","BC1","AC1","BC2","AC2","dc"]]
-    results_df.to_csv(out_dir/"angles_results.csv", index=False)
-    print(f"✅ Results saved to {out_dir/'angles_results.csv'}")

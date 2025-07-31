@@ -2,9 +2,9 @@ import math, json
 import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Superimposer
 from pathlib import Path
-from SCRIPT_VIS_GEO import write_pseudo_pdb, generate_pymol_script
+from .SCRIPT_VIS_GEO import write_pseudo_pdb, generate_pymol_script
 from collections import namedtuple
-from number import write_renumbered_fv
+from .number import write_renumbered_fv
 import os
 # ========================
 # Helpers
