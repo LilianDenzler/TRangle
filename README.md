@@ -4,6 +4,10 @@ The file `environment.yml` specifies the dependencies required to run the TRangl
 ```bash
 conda env create -f environment.yml
 ```
+In the main project directory run
+```bash
+pip install -e .
+```
 
 ## Measure angles of existing TCR structures
 To measure angles in existing TCR structures, you can use the `new_calc.py` script provided in the TRangle package. This script allows you to calculate angles and distances in a TCR structure file.
