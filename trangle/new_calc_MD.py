@@ -118,9 +118,6 @@ def process_inmem(input_struct, consA, consB, pcsA, pcsB, coresets):
 
 # Paths and data loading
 data_path = Path("/workspaces/Graphormer/TRangle/data")
-out_dir = Path("outputs"); out_dir.mkdir(exist_ok=True)
-fv_out = out_dir/"fv"; fv_out.mkdir(exist_ok=True)
-
 coresets = json.load(open(data_path/"coresets.json"))
 pcsA = np.loadtxt(data_path/"principal_components_alpha.csv")
 pcsB = np.loadtxt(data_path/"principal_components_beta.csv")

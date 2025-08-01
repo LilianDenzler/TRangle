@@ -424,10 +424,9 @@ def config(config_file):
     dc = config.getfloat('Angles', 'dc')
     return BA, BC1, BC2, AC1, AC2, dc
 
-def run(input_pdb, config_file):
-    BA, BC1, BC2, AC1, AC2, dc=config(config_file=config_file)
+def run(input_pdb,out_path, BA, BC1, BC2, AC1, AC2, dc):
     pdb_name = Path(input_pdb).stem
-    out_dir= Path("outputs")
+    out_dir= Path(out_path)
     out_dir.mkdir(exist_ok=True)
     tmp_out= out_dir/pdb_name
     tmp_out.mkdir(exist_ok=True)
@@ -455,6 +454,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Change TCR geometry based on angles.")
     parser.add_argument('--config', type=str, default='config.ini', help='Path to configuration file.')
     parser.add_argument('--input_pdb', type=str, help='Path to input PDB file.')
+    parser.add_argument('--out_path', type=str, default='output', help='Output directory for results.')
     args = parser.parse_args()
     if args.config:
         config_file = args.config
@@ -464,6 +464,11 @@ if __name__ == "__main__":
         input_pdb = args.input_pdb
     else:
         raise ValueError("Input PDB file must be specified.")
-    run(input_pdb, config_file)
+    if args.out_path:
+        out_path = args.out_path
+    else:
+        out_path = "output"
+    BA, BC1, BC2, AC1, AC2, dc=config(config_file=config_file)
+    run(input_pdb, out_path, BA, BC1, BC2, AC1, AC2, dc)
 
 

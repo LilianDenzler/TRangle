@@ -75,13 +75,10 @@ def number_sequences(sequences: Dict[str, SeqRecord], scheme: str = 'imgt') -> D
         (chain, str(seq_record.seq))
         for chain, seq_record in sequences.items()
     ]
-    print(formatted_input)
     numbering, details, _ = anarci(formatted_input, scheme = scheme)
     new_numbering=[]
     new_details=[]
     for num, det in zip(numbering, details):
-        print(num)
-        print(det)
         if not num or not det:
             print(f'No numbering found, skipping')
             continue
