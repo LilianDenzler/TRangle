@@ -1,4 +1,4 @@
-name: Abangle
+name: TCRangle
 channels:
   - defaults
   - conda-forge
@@ -29,4 +29,4 @@ dependencies:
   - anarci
   - scikit-learn
   - pymol-open-source
-prefix: /home/ws/anaconda3/envs/Abangle
+prefix: /home/ws/anaconda3/envs/TCRangle
