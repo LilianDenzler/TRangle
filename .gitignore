@@ -7,3 +7,4 @@ imgt_variable/
 imgt/
 examples/.Prod_Concat_A6_CMD.xtc_offsets.npz
 *.xtc
+trangle.egg-info/
