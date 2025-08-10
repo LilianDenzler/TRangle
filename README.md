@@ -40,7 +40,7 @@ This script will read the configuration file, apply the specified changes to the
 To extract the coordinates of loop anchor residues from a TCR structure, you can use the `extract_loop_anchor.py` script provided in the TRangle package. This script allows you to specify the loop anchor residues and extract their coordinates from a TCR structure file.
 
 ```bash
-python trangle/extract_loop_anchor.py path/to/your/input.pdb
+python trangle/get_anchor_coords.py path/to/your/input.pdb
 ```
 This will output a CSV file containing the coordinates of the specified loop anchor residues, which can be used for input to the CDR loop diffusion model.
 
